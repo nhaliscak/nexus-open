@@ -106,3 +106,13 @@ func formatValue(v float64, decimals int) string {
 	}
 	return fmt.Sprintf("%.*f", decimals, v)
 }
+
+var severityRank = map[string]int{"ok": 0, "warn": 1, "crit": 2}
+
+// worse returns the more severe of two severities.
+func worse(a, b string) string {
+	if severityRank[b] > severityRank[a] {
+		return b
+	}
+	return a
+}

@@ -36,6 +36,9 @@ type config struct {
 	totalQuery     string // shown as "value/total"; value < total is critical
 	secondaryQuery string // count shown in the secondary line
 	secondaryLabel string
+	detailQuery    string // second value shown in the secondary line
+	detailUnit     string
+	detailLimits   thresholds
 	sparkMax       float64 // fixed graph ceiling; 0 = autoscale
 	timeout        time.Duration
 }
@@ -96,6 +99,11 @@ func (p *PrometheusPlugin) Describe() (plugin.Descriptor, error) {
 			{Key: "secondary_query", Label: "Problem count query", Type: plugin.FieldTypeString,
 				Help: "Optional; a non-zero result is shown and raises a warning"},
 			{Key: "secondary_label", Label: "Problem count label", Type: plugin.FieldTypeString},
+			{Key: "detail_query", Label: "Detail query", Type: plugin.FieldTypeString,
+				Help: "Optional second value shown under the main one, e.g. a node's temperature"},
+			{Key: "detail_unit", Label: "Detail unit", Type: plugin.FieldTypeString},
+			{Key: "detail_warn", Label: "Detail warn at", Type: plugin.FieldTypeString},
+			{Key: "detail_crit", Label: "Detail critical at", Type: plugin.FieldTypeString},
 			{Key: "spark_max", Label: "Graph ceiling", Type: plugin.FieldTypeString,
 				Help: "Fixed top of the graph (e.g. 100 for %); empty autoscales"},
 		}},
@@ -149,6 +157,8 @@ func parseConfig(raw map[string]any) (config, error) {
 	str("total_query", &cfg.totalQuery)
 	str("secondary_query", &cfg.secondaryQuery)
 	str("secondary_label", &cfg.secondaryLabel)
+	str("detail_query", &cfg.detailQuery)
+	str("detail_unit", &cfg.detailUnit)
 
 	var reduce string
 	str("reduce", &reduce)
@@ -165,6 +175,8 @@ func parseConfig(raw map[string]any) (config, error) {
 	num("decimals", &decimals)
 	num("warn", &cfg.limits.warn)
 	num("crit", &cfg.limits.crit)
+	num("detail_warn", &cfg.detailLimits.warn)
+	num("detail_crit", &cfg.detailLimits.crit)
 	num("spark_max", &cfg.sparkMax)
 	num("timeout_ms", &timeoutMs)
 	if err != nil {
@@ -250,6 +262,19 @@ func (p *PrometheusPlugin) Sample() (plugin.Payload, error) {
 				secondary = append(secondary, shortLabel(name)+" "+formatValue(top.Value, cfg.decimals)+cfg.unit)
 			}
 		}
+	}
+
+	if cfg.detailQuery != "" {
+		detailSamples, err := client.query(ctx, cfg.detailQuery)
+		if err != nil {
+			return plugin.Payload{}, fmt.Errorf("detail query: %w", err)
+		}
+		detail, err := reduceMax.apply(detailSamples)
+		if err != nil {
+			return plugin.Payload{}, fmt.Errorf("detail query: %w", err)
+		}
+		secondary = append(secondary, formatValue(detail, cfg.decimals)+cfg.detailUnit)
+		severity = worse(severity, cfg.detailLimits.classify(detail))
 	}
 
 	if cfg.secondaryQuery != "" {
