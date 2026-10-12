@@ -1,0 +1,225 @@
+# Cluster Layout
+# Cluster-wide health from Prometheus (kube-prometheus-stack with
+# node-exporter and kube-state-metrics). Each zone is one PromQL query run by
+# the prometheus plugin; edit the queries to match your metric labels.
+#
+# node-exporter's instance label is IP:port, so node queries join
+# node_uname_info to name nodes (nodename). The default URL is the in-cluster Prometheus service, reachable from any
+# k3s node. Set plugin_config.url to point elsewhere.
+
+name: "Cluster"
+version: "1.0"
+
+theme:
+  bg: "#000000"
+  fg: "#EAEAEA"
+  muted: "#B8BDC2"
+  accent: "#00C8FF"
+  gutter_px: 2
+  font_size_primary: 24
+  font_size_secondary: 9
+
+navigation:
+  swipe_enabled: true
+  auto_rotate: false
+  auto_rotate_interval_s: 10
+
+pages:
+  - name: "Cluster"
+    zones:
+      # Average CPU across nodes; the secondary line names the busiest node.
+      - id: cluster.cpu
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#38C878"
+        plugin_config:
+          query: '100 - avg by (nodename)(rate(node_cpu_seconds_total{mode="idle"}[1m]) * on(instance) group_left(nodename) node_uname_info) * 100'
+          reduce: avg
+          label: CPU
+          unit: "%"
+          top_label: nodename
+          warn: 75
+          crit: 90
+          spark_max: 100
+
+      # Average memory use across nodes; names the fullest node.
+      - id: cluster.mem
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#00C8FF"
+        plugin_config:
+          query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info'
+          reduce: avg
+          label: MEM
+          unit: "%"
+          top_label: nodename
+          warn: 80
+          crit: 92
+          spark_max: 100
+
+      # Hottest SoC/big-core thermal zone on any node (RK3588 exposes seven
+      # zones per node; the GPU/NPU zones are left out).
+      - id: cluster.temp
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#FF6B35"
+        plugin_config:
+          query: 'max by (nodename)(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info)'
+          reduce: max
+          label: TEMP
+          unit: "°C"
+          top_label: nodename
+          warn: 70
+          crit: 85
+          spark_max: 100
+
+      # Ready nodes out of all nodes, plus pods stuck outside Running.
+      - id: cluster.k8s
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#C87820"
+        plugin_config:
+          query: 'sum(kube_node_status_condition{condition="Ready",status="true"})'
+          reduce: sum
+          label: NODES
+          total_query: 'count(kube_node_info)'
+          secondary_query: 'count(kube_pod_status_phase{phase=~"Pending|Failed|Unknown"} == 1)'
+          secondary_label: pods down
+
+  - name: "Pods"
+    zones:
+      # Running pods out of all live pods (completed Jobs excluded).
+      - id: pods.running
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#38C878"
+        plugin_config:
+          query: 'sum(kube_pod_status_phase{phase="Running"})'
+          reduce: sum
+          label: PODS
+          total_query: 'sum(kube_pod_status_phase{phase=~"Running|Pending|Failed|Unknown"})'
+
+      # Container restarts in the last 15 minutes; names the worst namespace.
+      - id: pods.restarts
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 15000
+        align: left
+        theme_override:
+          accent: "#FF6B35"
+        plugin_config:
+          query: 'sum by (namespace)(increase(kube_pod_container_status_restarts_total[15m]))'
+          reduce: sum
+          label: RESTARTS 15m
+          top_label: namespace
+          warn: 1
+          crit: 5
+
+      # Pods stuck Pending (unschedulable, image pulls, PVC waits).
+      - id: pods.pending
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#C87820"
+        plugin_config:
+          query: 'sum by (namespace)(kube_pod_status_phase{phase="Pending"})'
+          reduce: sum
+          label: PENDING
+          top_label: namespace
+          warn: 1
+          crit: 3
+
+      # Deployments missing replicas; names the worst deployment.
+      - id: pods.deployments
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#00C8FF"
+        plugin_config:
+          query: 'sum by (deployment)(kube_deployment_status_replicas_unavailable)'
+          reduce: sum
+          label: UNAVAIL
+          top_label: deployment
+          warn: 1
+          crit: 2
+
+  - name: "Tradebot"
+    zones:
+      # Strategy bots and collector: available replicas out of desired.
+      - id: tradebot.bots
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#38C878"
+        plugin_config:
+          query: 'sum(kube_deployment_status_replicas_available{namespace="tradebot"})'
+          reduce: sum
+          label: BOTS
+          total_query: 'sum(kube_deployment_spec_replicas{namespace="tradebot"})'
+
+      # Postgres StatefulSet ready replicas out of desired.
+      - id: tradebot.db
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#00C8FF"
+        plugin_config:
+          query: 'sum(kube_statefulset_status_replicas_ready{namespace="tradebot",statefulset="tradebot-postgresql"})'
+          reduce: sum
+          label: DB
+          total_query: 'sum(kube_statefulset_replicas{namespace="tradebot",statefulset="tradebot-postgresql"})'
+
+      # Hours since the daily split-adjuster CronJob last succeeded.
+      - id: tradebot.cron
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 60000
+        align: left
+        theme_override:
+          accent: "#C87820"
+        plugin_config:
+          query: '(time() - max(kube_cronjob_status_last_successful_time{namespace="tradebot"})) / 3600'
+          reduce: max
+          label: CRON age
+          unit: h
+          warn: 25
+          crit: 49
+
+      # Container restarts in tradebot over 15 minutes; names the pod.
+      - id: tradebot.restarts
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 15000
+        align: left
+        theme_override:
+          accent: "#FF6B35"
+        plugin_config:
+          query: 'sum by (pod)(increase(kube_pod_container_status_restarts_total{namespace="tradebot"}[15m]))'
+          reduce: sum
+          label: RESTARTS 15m
+          top_label: pod
+          warn: 1
+          crit: 5
