@@ -18,8 +18,13 @@ const (
 )
 
 func (r reducer) apply(samples []sample) (float64, error) {
-	if r == reduceCount {
+	switch {
+	case r == reduceCount:
 		return float64(len(samples)), nil
+	case r == reduceSum && len(samples) == 0:
+		// Problem queries ("pods pending", "restarts > 0") return nothing
+		// when healthy; their sum is zero, not an error.
+		return 0, nil
 	}
 	if len(samples) == 0 {
 		return 0, fmt.Errorf("query returned no series")

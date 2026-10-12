@@ -244,7 +244,8 @@ func (p *PrometheusPlugin) Sample() (plugin.Payload, error) {
 	}
 
 	if cfg.topLabel != "" && len(samples) > 1 {
-		if top, ok := extreme(samples, cfg.topLowest); ok {
+		// A zero top value (no restarts anywhere) names nothing useful.
+		if top, ok := extreme(samples, cfg.topLowest); ok && top.Value != 0 {
 			if name := top.Labels[cfg.topLabel]; name != "" {
 				secondary = append(secondary, shortLabel(name)+" "+formatValue(top.Value, cfg.decimals)+cfg.unit)
 			}
