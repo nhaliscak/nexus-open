@@ -85,8 +85,10 @@ func parseFirmwareVersion(buf []byte) (string, error) {
 			return "", fmt.Errorf("firmware version contains non-printable byte 0x%02x", c)
 		}
 	}
-	if len(raw) == 0 {
+	// Firmware 2.2.6.0 pads the string with a trailing space.
+	version := strings.TrimSpace(string(raw))
+	if version == "" {
 		return "", fmt.Errorf("firmware version is empty")
 	}
-	return string(raw), nil
+	return version, nil
 }

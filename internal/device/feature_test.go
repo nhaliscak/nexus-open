@@ -85,6 +85,12 @@ func TestParseFirmwareVersion(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 
+	// Real device (firmware 2.2.6.0) pads with a trailing space.
+	got, err = parseFirmwareVersion(firmwareBuf("2.2.6.0 ", 32))
+	if err != nil || got != "2.2.6.0" {
+		t.Errorf("padded: got %q, %v", got, err)
+	}
+
 	// No NUL terminator: the string runs to the end of the buffer.
 	got, err = parseFirmwareVersion(firmwareBuf("2.1", firmwareVersionOffset+3))
 	if err != nil || got != "2.1" {
@@ -101,6 +107,7 @@ func TestParseFirmwareVersion_Errors(t *testing.T) {
 		"too short":     {0x05, 0, 0},
 		"wrong id":      wrongID,
 		"empty":         firmwareBuf("", 64),
+		"blank":         firmwareBuf("   ", 64),
 		"non-printable": nonPrintable,
 	}
 	for name, buf := range tests {
