@@ -1,0 +1,15 @@
+# udev rules for Corsair iCUE Nexus (VID: 0x1b1c, PID: 0x1b8e) — headless.
+#
+# Use instead of 99-corsair-nexus.rules on machines with no logind seat (SBCs,
+# cluster nodes): TAG+="uaccess" only grants the active desktop user, so here
+# the device goes to the plugdev group, which nexus-open-headless.service
+# joins via SupplementaryGroups.
+#
+# The desktop rule's RUN+="usbreset" is omitted: not every distro ships the
+# usbreset binary, and a failing RUN makes udev log an error on each attach.
+
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1b1c", ATTRS{idProduct}=="1b8e", \
+    GROUP="plugdev", MODE="0660"
+
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1b1c", ATTRS{idProduct}=="1b8e", \
+    GROUP="plugdev", MODE="0660"

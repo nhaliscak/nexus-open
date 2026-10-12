@@ -1,7 +1,7 @@
 # Nexus Open - Makefile
 # Standardized build system for all targets
 
-.PHONY: help setup doctor build build-debug build-release build-ui build-plugins build-all test test-race coverage clean clean-ui install uninstall run run-tray dev dev-backend dev-ui dev-ui-reload deb rpm generate-api models all changelog release
+.PHONY: help setup doctor build build-debug build-release build-ui build-plugins build-arm64 build-all test test-race coverage clean clean-ui install uninstall run run-tray dev dev-backend dev-ui dev-ui-reload deb rpm generate-api models all changelog release
 
 # Configuration
 APP_NAME := nexus-open
@@ -43,6 +43,7 @@ help:
 	@echo "  make build-ui      - Build Flutter UI only"
 	@echo "  make build-plugins - Build all external plugins"
 	@echo "  make build-all     - Build backend, UI, and all plugins"
+	@echo "  make build-arm64   - Cross-compile headless daemon + plugins for linux/arm64"
 	@echo "  make build-release - Build optimized release binary (stripped)"
 	@echo "  make run           - Build and run Go backend only"
 	@echo "  make run-tray      - Build and run bundled app with system tray"
@@ -124,6 +125,23 @@ build-plugins:
 		fi; \
 	done
 	@echo "✓ Plugins built"
+
+# Cross-compile a headless daemon + plugins for 64-bit ARM SBCs (e.g. Turing RK1).
+# No UI or tray; deploy with packaging/systemd/nexus-open-headless.service.
+ARM64_DIR := $(DIST_DIR)/linux-arm64
+build-arm64:
+	@echo "Building $(APP_NAME) for linux/arm64..."
+	@mkdir -p $(ARM64_DIR)/plugins
+	@GOOS=linux GOARCH=arm64 $(GO_BUILD) $(GOFLAGS) -ldflags "$(LDFLAGS) -s -w" -o $(ARM64_DIR)/$(APP_NAME) ./$(CMD_DIR)
+	@for mod in cpu-temp gpu-temp network weather cpu-load gpu-load media; do \
+		if [ -d plugins/$$mod ]; then \
+			echo "  → plugins/$$mod"; \
+			(cd plugins/$$mod && GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build $(GOFLAGS) -ldflags "$(LDFLAGS) -s -w" -o ../../$(ARM64_DIR)/plugins/nexus-$$mod .) || exit 1; \
+		fi; \
+	done
+	@cp packaging/systemd/nexus-open-headless.service packaging/udev/99-corsair-nexus-headless.rules $(ARM64_DIR)/
+	@cp -r configs $(ARM64_DIR)/
+	@echo "✓ Built: $(ARM64_DIR)/"
 
 # Build backend, UI, and all plugins
 build-all: build build-ui build-plugins
