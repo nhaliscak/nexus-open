@@ -119,9 +119,13 @@ pages:
           spark_max: 100
           detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node1"})'
           detail_unit: "°C"
+          detail_warn: 70
+          detail_crit: 85
           detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node1"}'
           detail2_label: mem
           detail2_unit: "%"
+          detail2_warn: 80
+          detail2_crit: 92
 
       - id: nodes.node2
         width: 160
@@ -140,9 +144,13 @@ pages:
           spark_max: 100
           detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node2"})'
           detail_unit: "°C"
+          detail_warn: 70
+          detail_crit: 85
           detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node2"}'
           detail2_label: mem
           detail2_unit: "%"
+          detail2_warn: 80
+          detail2_crit: 92
 
       - id: nodes.node3
         width: 160
@@ -161,9 +169,13 @@ pages:
           spark_max: 100
           detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node3"})'
           detail_unit: "°C"
+          detail_warn: 70
+          detail_crit: 85
           detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node3"}'
           detail2_label: mem
           detail2_unit: "%"
+          detail2_warn: 80
+          detail2_crit: 92
 
       - id: nodes.node4
         width: 160
@@ -182,9 +194,13 @@ pages:
           spark_max: 100
           detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node4"})'
           detail_unit: "°C"
+          detail_warn: 70
+          detail_crit: 85
           detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node4"}'
           detail2_label: mem
           detail2_unit: "%"
+          detail2_warn: 80
+          detail2_crit: 92
 
   - name: "Pods"
     zones:

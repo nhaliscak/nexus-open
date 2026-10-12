@@ -63,6 +63,7 @@ func defaultConfig() config {
 // temperature under its CPU tile.
 type detail struct {
 	query, label, unit string
+	limits             thresholds // a hot detail can raise the tile's severity
 }
 
 // detailKeys are the config key prefixes for details, in display order.
@@ -126,9 +127,13 @@ func (p *PrometheusPlugin) Describe() (plugin.Descriptor, error) {
 				Help: "Optional; a value shown on the secondary line (max of the series)"},
 			{Key: "detail_label", Label: "Detail label", Type: plugin.FieldTypeString},
 			{Key: "detail_unit", Label: "Detail unit", Type: plugin.FieldTypeString},
+			{Key: "detail_warn", Label: "Detail warn at", Type: plugin.FieldTypeString},
+			{Key: "detail_crit", Label: "Detail critical at", Type: plugin.FieldTypeString},
 			{Key: "detail2_query", Label: "Second detail query", Type: plugin.FieldTypeString},
 			{Key: "detail2_label", Label: "Second detail label", Type: plugin.FieldTypeString},
 			{Key: "detail2_unit", Label: "Second detail unit", Type: plugin.FieldTypeString},
+			{Key: "detail2_warn", Label: "Second detail warn at", Type: plugin.FieldTypeString},
+			{Key: "detail2_crit", Label: "Second detail critical at", Type: plugin.FieldTypeString},
 			{Key: "spark_max", Label: "Graph ceiling", Type: plugin.FieldTypeString,
 				Help: "Fixed top of the graph (e.g. 100 for %); empty autoscales"},
 		}},
@@ -187,6 +192,8 @@ func parseConfig(raw map[string]any) (config, error) {
 		str(k+"_query", &d.query)
 		str(k+"_label", &d.label)
 		str(k+"_unit", &d.unit)
+		num(k+"_warn", &d.limits.warn)
+		num(k+"_crit", &d.limits.crit)
 		if d.query != "" {
 			cfg.details = append(cfg.details, d)
 		}
@@ -327,6 +334,7 @@ func (p *PrometheusPlugin) Sample() (plugin.Payload, error) {
 			text = d.label + " " + text
 		}
 		secondary = append(secondary, text)
+		severity = worse(severity, d.limits.classify(v))
 	}
 
 	p.mu.Lock()

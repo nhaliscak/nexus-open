@@ -279,3 +279,33 @@ func TestSample_TTLOutlastsSlowRefresh(t *testing.T) {
 		t.Errorf("ttl_ms: TTL %v, want 5s", got.TTL)
 	}
 }
+
+func TestSample_PerNodeWithDetail(t *testing.T) {
+	cpu := `cpu{nodename="node2"}`
+	temp := `temp{nodename="node2"}`
+	tests := []struct {
+		cpu, temp string
+		want      plugin.Severity
+	}{
+		{"12", "54", plugin.SeverityOK},
+		{"12", "72", plugin.SeverityWarn}, // hot node raises the tile
+		{"95", "54", plugin.SeverityCrit},
+		{"80", "90", plugin.SeverityCrit},
+	}
+	for _, tt := range tests {
+		srv := fakeProm(t, map[string]string{cpu: vector("node2", tt.cpu), temp: vector("node2", tt.temp)})
+		got, err := configured(t, srv.URL, map[string]any{
+			"query": cpu, "reduce": "max", "unit": "%", "label": "node2", "warn": 75, "crit": 90,
+			"detail_query": temp, "detail_unit": "°C", "detail_warn": 70, "detail_crit": 85,
+		}).Sample()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := "node2 · " + tt.temp + "°C"; got.Secondary != want {
+			t.Errorf("secondary = %q, want %q", got.Secondary, want)
+		}
+		if got.Severity != tt.want {
+			t.Errorf("cpu %s temp %s: severity %q, want %q", tt.cpu, tt.temp, got.Severity, tt.want)
+		}
+	}
+}
