@@ -132,6 +132,12 @@ func (h *usbHandle) close() {
 	_ = unix.Close(h.fd)
 }
 
+func (h *usbHandle) isClosed() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.closed
+}
+
 // writeFrame sends a 1024-byte packet to EP 0x02 OUT.
 func (h *usbHandle) writeFrame(pkt []byte) error {
 	if len(pkt) != 1024 {
@@ -173,13 +179,19 @@ func (h *usbHandle) ReadTouch(buf []byte, _ uint) (int, error) {
 	return n, nil
 }
 
-// setBrightness sends a HID SET_REPORT feature report (report ID 3).
-func (h *usbHandle) setBrightness(value int) error {
-	data := []byte{3, 1, byte(value)}
+// setFeatureReport sends a HID SET_REPORT feature report. data[0] is the
+// report ID, as with hidraw.
+func (h *usbHandle) setFeatureReport(data []byte) error {
+	if len(data) == 0 {
+		return fmt.Errorf("USB set feature: empty report")
+	}
+	if h.isClosed() {
+		return fmt.Errorf("USB set feature: handle closed")
+	}
 	xfer := ctrlTransfer{
 		requestType: 0x21, // LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE | LIBUSB_ENDPOINT_OUT
 		request:     0x09, // HID SET_REPORT
-		value:       (3 << 8) | 3, // type=Feature(3), report_id=3
+		value:       (3 << 8) | uint16(data[0]), // type=Feature(3), report_id
 		index:       0,
 		length:      uint16(len(data)),
 		timeout:     1000,
@@ -188,9 +200,35 @@ func (h *usbHandle) setBrightness(value int) error {
 	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(h.fd),
 		ioctlControl, uintptr(unsafe.Pointer(&xfer)))
 	if errno != 0 {
-		return fmt.Errorf("USB brightness: %w", errno)
+		return fmt.Errorf("USB set feature 0x%02x: %w", data[0], errno)
 	}
 	return nil
+}
+
+// getFeatureReport issues a HID GET_REPORT for a feature report and returns
+// the number of bytes the device wrote into buf (report ID included).
+func (h *usbHandle) getFeatureReport(reportID byte, buf []byte) (int, error) {
+	if len(buf) == 0 {
+		return 0, fmt.Errorf("USB get feature: empty buffer")
+	}
+	if h.isClosed() {
+		return 0, fmt.Errorf("USB get feature: handle closed")
+	}
+	xfer := ctrlTransfer{
+		requestType: 0xa1, // LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE | LIBUSB_ENDPOINT_IN
+		request:     0x01, // HID GET_REPORT
+		value:       (3 << 8) | uint16(reportID), // type=Feature(3), report_id
+		index:       0,
+		length:      uint16(len(buf)),
+		timeout:     1000,
+		data:        uintptr(unsafe.Pointer(&buf[0])),
+	}
+	r, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(h.fd),
+		ioctlControl, uintptr(unsafe.Pointer(&xfer)))
+	if errno != 0 {
+		return 0, fmt.Errorf("USB get feature 0x%02x: %w", reportID, errno)
+	}
+	return int(r), nil
 }
 
 // interruptTransfer executes a USBDEVFS_BULK ioctl (which handles interrupt

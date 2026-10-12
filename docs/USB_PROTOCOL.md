@@ -92,6 +92,35 @@ Data           [0x03, 0x01, brightness]
 
 `brightness` is a raw byte in the range `0–100`. `0` turns the backlight off.
 
+## Other Feature Reports
+
+Report 3 is a general command channel: byte 0 is the report ID (`0x03`),
+byte 1 the command, and the rest are arguments. All are sent with the same
+SET_REPORT request as brightness, with `wLength` set to the report length.
+These commands are taken from [NexusTool](https://github.com/willneedit/NexusTool)
+and [OpenLinkHub](https://github.com/jurkovic-nikola/OpenLinkHub), which both
+use them against the device; they are implemented in `internal/device/feature.go`.
+
+| Bytes | Command |
+|---|---|
+| `03 01 nn` | Set brightness, `nn` = 0–100 |
+| `03 04` | Blank the screen |
+| `03 0d aa ll` | Play built-in animation `aa` (1–3); `ll` = 1 to loop, 0 for once |
+| `03 0f` | Stop the built-in animation |
+
+Other command values are unknown.
+
+**Returning to hardware mode.** The firmware keeps showing the last frame the
+host sent until told otherwise. Sending `03 0d 01 01` (loop animation 1) then
+`03 01 64` (brightness 100) hands the panel back to the firmware's own
+animation. Nexus Open does this on shutdown via `RestoreHardwareMode`, falling
+back to a blank frame if the command fails.
+
+**Firmware version.** Report 5 is read with GET_REPORT
+(`bmRequestType 0xA1`, `bRequest 0x01`, `wValue 0x0305`, `wLength 64`). The
+response starts with the report ID; bytes 6 onwards are a NUL-terminated
+ASCII version string. Bytes 1–5 are unknown.
+
 ## Touch Input
 
 Touch events arrive as 512-byte HID input reports on EP `0x81`

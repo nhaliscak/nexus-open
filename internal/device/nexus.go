@@ -265,10 +265,89 @@ func (n *NexusDevice) ReadTouch(ctx context.Context) ([]touch.Event, error) {
 
 // SetBrightness sets the display brightness (0–100).
 func (n *NexusDevice) SetBrightness(brightness int) error {
-	if brightness < 0 || brightness > 100 {
-		return fmt.Errorf("brightness must be 0-100, got %d", brightness)
+	report, err := brightnessReport(brightness)
+	if err != nil {
+		return err
+	}
+	if err := n.sendFeatureReports(report); err != nil {
+		return fmt.Errorf("failed to set brightness: %w", err)
 	}
 
+	n.logger.Debug("brightness set", "value", brightness)
+	return nil
+}
+
+// PlayAnimation starts one of the firmware's built-in animations
+// (MinAnimation–MaxAnimation), once or looping. Frames sent afterwards
+// replace it on screen.
+func (n *NexusDevice) PlayAnimation(animation int, loop bool) error {
+	report, err := playAnimationReport(animation, loop)
+	if err != nil {
+		return err
+	}
+	if err := n.sendFeatureReports(report); err != nil {
+		return fmt.Errorf("failed to play animation: %w", err)
+	}
+	n.logger.Debug("animation started", "animation", animation, "loop", loop)
+	return nil
+}
+
+// StopAnimation stops a running built-in animation.
+func (n *NexusDevice) StopAnimation() error {
+	if err := n.sendFeatureReports(stopAnimationReport()); err != nil {
+		return fmt.Errorf("failed to stop animation: %w", err)
+	}
+	return nil
+}
+
+// BlankScreen asks the firmware to clear the panel.
+func (n *NexusDevice) BlankScreen() error {
+	if err := n.sendFeatureReports(blankScreenReport()); err != nil {
+		return fmt.Errorf("failed to blank screen: %w", err)
+	}
+	return nil
+}
+
+// RestoreHardwareMode hands the display back to the firmware by looping its
+// power-on animation at full brightness. Call it before Disconnect on
+// shutdown; otherwise the panel keeps the last frame the host sent.
+func (n *NexusDevice) RestoreHardwareMode() error {
+	if err := n.sendFeatureReports(hardwareModeReports()...); err != nil {
+		return fmt.Errorf("failed to restore hardware mode: %w", err)
+	}
+	n.logger.Info("display returned to hardware mode")
+	return nil
+}
+
+// GetFirmwareVersion reads the firmware version string from feature report 5.
+func (n *NexusDevice) GetFirmwareVersion() (string, error) {
+	n.mu.RLock()
+	connected, h := n.connected, n.handle
+	n.mu.RUnlock()
+
+	if !connected || h == nil {
+		return "", ErrDeviceDisconnected
+	}
+
+	buf := make([]byte, firmwareReportLen)
+	n.writeMu.Lock()
+	got, err := h.getFeatureReport(reportIDFirmware, buf)
+	n.writeMu.Unlock()
+	if err != nil {
+		return "", fmt.Errorf("failed to read firmware version: %w", err)
+	}
+
+	version, err := parseFirmwareVersion(buf[:got])
+	if err != nil {
+		n.logger.Debug("unparseable firmware report", "bytes", fmt.Sprintf("% x", buf[:got]))
+		return "", err
+	}
+	return version, nil
+}
+
+// sendFeatureReports sends each report in order under writeMu, so a command
+// sequence cannot interleave with a frame transfer.
+func (n *NexusDevice) sendFeatureReports(reports ...[]byte) error {
 	n.mu.RLock()
 	connected, h := n.connected, n.handle
 	n.mu.RUnlock()
@@ -280,17 +359,12 @@ func (n *NexusDevice) SetBrightness(brightness int) error {
 	n.writeMu.Lock()
 	defer n.writeMu.Unlock()
 
-	if err := h.setBrightness(brightness); err != nil {
-		return fmt.Errorf("failed to set brightness: %w", err)
+	for _, r := range reports {
+		if err := h.setFeatureReport(r); err != nil {
+			return err
+		}
 	}
-
-	n.logger.Debug("brightness set", "value", brightness)
 	return nil
-}
-
-// GetFirmwareVersion is not yet implemented via raw libusb.
-func (n *NexusDevice) GetFirmwareVersion() (string, error) {
-	return "", fmt.Errorf("GetFirmwareVersion not implemented")
 }
 
 // DeviceInfo holds static information read from the USB device at connect time.

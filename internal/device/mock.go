@@ -17,6 +17,7 @@ type MockDevice struct {
 	framesSent     int
 	lastFrame      []byte
 	touchEvents    []touch.Event
+	featureCmds    []string // feature commands received, in order
 
 	// Callbacks for testing
 	OnConnect    func(ctx context.Context) error
@@ -194,6 +195,40 @@ func (m *MockDevice) GetFirmwareVersion() (string, error) {
 	}
 
 	return "1.0.0-mock", nil
+}
+
+// PlayAnimation records a play-animation command.
+func (m *MockDevice) PlayAnimation(animation int, loop bool) error {
+	if _, err := playAnimationReport(animation, loop); err != nil {
+		return err
+	}
+	return m.recordFeature("play_animation")
+}
+
+// StopAnimation records a stop-animation command.
+func (m *MockDevice) StopAnimation() error { return m.recordFeature("stop_animation") }
+
+// BlankScreen records a blank-screen command.
+func (m *MockDevice) BlankScreen() error { return m.recordFeature("blank_screen") }
+
+// RestoreHardwareMode records a restore-hardware-mode command.
+func (m *MockDevice) RestoreHardwareMode() error { return m.recordFeature("restore_hardware_mode") }
+
+// GetFeatureCommands returns the feature commands received so far.
+func (m *MockDevice) GetFeatureCommands() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return append([]string(nil), m.featureCmds...)
+}
+
+func (m *MockDevice) recordFeature(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.connected {
+		return ErrDeviceDisconnected
+	}
+	m.featureCmds = append(m.featureCmds, name)
+	return nil
 }
 
 // GetDeviceInfo returns mock device info.

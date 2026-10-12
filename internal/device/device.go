@@ -39,6 +39,13 @@ type Device interface {
 	SetBrightness(brightness int) error
 	GetFirmwareVersion() (string, error)
 	GetDeviceInfo() DeviceInfo
+	PlayAnimation(animation int, loop bool) error
+	StopAnimation() error
+	BlankScreen() error
+
+	// RestoreHardwareMode hands the display back to the firmware's own
+	// animation. Call before Disconnect on shutdown.
+	RestoreHardwareMode() error
 }
 
 // ConnectionConfig holds configuration for device connection.

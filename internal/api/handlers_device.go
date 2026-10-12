@@ -90,7 +90,7 @@ func (s *Server) handleDeviceInfo(w http.ResponseWriter, r *http.Request) {
 		"manufacturer": di.Manufacturer,
 	}
 
-	// Best-effort firmware version — not implemented in libusb path.
+	// Best-effort firmware version from feature report 5.
 	if firmware, err := s.device.GetFirmwareVersion(); err == nil {
 		info["firmware"] = firmware
 	}
