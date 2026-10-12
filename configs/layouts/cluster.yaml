@@ -95,3 +95,67 @@ pages:
           total_query: 'count(kube_node_info)'
           secondary_query: 'count(kube_pod_status_phase{phase=~"Pending|Failed|Unknown"} == 1)'
           secondary_label: pods down
+
+  - name: "Pods"
+    zones:
+      # Running pods out of all live pods (completed Jobs excluded).
+      - id: pods.running
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#38C878"
+        plugin_config:
+          query: 'sum(kube_pod_status_phase{phase="Running"})'
+          reduce: sum
+          label: PODS
+          total_query: 'sum(kube_pod_status_phase{phase=~"Running|Pending|Failed|Unknown"})'
+
+      # Container restarts in the last 15 minutes; names the worst namespace.
+      - id: pods.restarts
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 15000
+        align: left
+        theme_override:
+          accent: "#FF6B35"
+        plugin_config:
+          query: 'sum by (namespace)(increase(kube_pod_container_status_restarts_total[15m]))'
+          reduce: sum
+          label: RESTARTS 15m
+          top_label: namespace
+          warn: 1
+          crit: 5
+
+      # Pods stuck Pending (unschedulable, image pulls, PVC waits).
+      - id: pods.pending
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#C87820"
+        plugin_config:
+          query: 'sum by (namespace)(kube_pod_status_phase{phase="Pending"})'
+          reduce: sum
+          label: PENDING
+          top_label: namespace
+          warn: 1
+          crit: 3
+
+      # Deployments missing replicas; names the worst deployment.
+      - id: pods.deployments
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#00C8FF"
+        plugin_config:
+          query: 'sum by (deployment)(kube_deployment_status_replicas_unavailable)'
+          reduce: sum
+          label: UNAVAIL
+          top_label: deployment
+          warn: 1
+          crit: 2
