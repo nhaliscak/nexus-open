@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mantonx/nexus-open/pkg/plugin"
 )
@@ -260,5 +261,21 @@ func TestSample_Details(t *testing.T) {
 	}
 	if got.Secondary != "node1 · mem 9%" {
 		t.Errorf("empty detail: got %q", got.Secondary)
+	}
+}
+
+func TestSample_TTLOutlastsSlowRefresh(t *testing.T) {
+	q := `up`
+	srv := fakeProm(t, map[string]string{q: `{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1760000000,"1"]}]}}`})
+	got, err := configured(t, srv.URL, map[string]any{"query": q}).Sample()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TTL < time.Minute {
+		t.Errorf("TTL %v would expire between 60 s refreshes", got.TTL)
+	}
+	got, _ = configured(t, srv.URL, map[string]any{"query": q, "ttl_ms": 5000}).Sample()
+	if got.TTL != 5*time.Second {
+		t.Errorf("ttl_ms: TTL %v, want 5s", got.TTL)
 	}
 }

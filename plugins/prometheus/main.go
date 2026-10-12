@@ -20,7 +20,10 @@ import (
 const (
 	defaultURL     = "http://kube-prometheus-stack-prometheus.monitoring:9090"
 	defaultTimeout = 3 * time.Second
-	sparkSamples   = 60
+	// defaultTTL must outlast the slowest zone refresh (cluster.yaml goes up
+	// to 60 s), or the host blanks the tile as "Stale" between samples.
+	defaultTTL   = 2 * time.Minute
+	sparkSamples = 60
 )
 
 // config is one zone's settings, parsed from plugin_config.
@@ -40,6 +43,7 @@ type config struct {
 	details        []detail // extra values appended to the secondary line
 	sparkMax       float64  // fixed graph ceiling; 0 = autoscale
 	timeout        time.Duration
+	ttl            time.Duration // how long a sample stays valid on screen
 }
 
 // urlEnv overrides defaultURL for every zone that doesn't set url itself.
@@ -52,7 +56,7 @@ func defaultConfig() config {
 	if env := os.Getenv(urlEnv); env != "" {
 		u = env
 	}
-	return config{url: u, reduce: reduceAvg, timeout: defaultTimeout}
+	return config{url: u, reduce: reduceAvg, timeout: defaultTimeout, ttl: defaultTTL}
 }
 
 // detail is an extra value shown on the secondary line, e.g. a node's
@@ -205,10 +209,15 @@ func parseConfig(raw map[string]any) (config, error) {
 	num("crit", &cfg.limits.crit)
 	num("spark_max", &cfg.sparkMax)
 	num("timeout_ms", &timeoutMs)
+	var ttlMs float64
+	num("ttl_ms", &ttlMs)
 	if err != nil {
 		return cfg, err
 	}
 	cfg.decimals = int(decimals)
+	if ttlMs > 0 {
+		cfg.ttl = time.Duration(ttlMs) * time.Millisecond
+	}
 	if timeoutMs > 0 {
 		cfg.timeout = time.Duration(timeoutMs) * time.Millisecond
 	}
@@ -332,7 +341,7 @@ func (p *PrometheusPlugin) Sample() (plugin.Payload, error) {
 		Severity:  plugin.Severity(severity),
 		Spark:     spark,
 		GraphType: plugin.GraphTypeArea,
-		TTL:       2 * cfg.timeout,
+		TTL:       cfg.ttl,
 		Icon:      "chart-line",
 		Timestamp: time.Now(),
 	}, nil
