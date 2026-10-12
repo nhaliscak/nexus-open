@@ -159,14 +159,16 @@ func (a *App) Shutdown() error {
 			a.logger.Warn("render loop did not exit cleanly within 5s")
 		}
 
-		// Send a blank frame so the device shows black rather than frozen content.
-		// The Corsair firmware has no "release to native" command and will reset
-		// on touch after shutdown — this is a firmware limitation with no
-		// software workaround on Linux.
+		// Hand the display back to the firmware so it shows its own animation
+		// instead of the last frame we sent. Fall back to a blank frame if the
+		// command fails, so the panel at least doesn't show stale content.
 		if a.device != nil && a.device.IsConnected() {
-			blank := make([]byte, 640*48*4)
-			if err := a.device.SendFrame(context.Background(), blank); err != nil {
-				a.logger.Debug("failed to send blank frame on shutdown", "error", err)
+			if err := a.device.RestoreHardwareMode(); err != nil {
+				a.logger.Warn("failed to restore hardware mode, blanking instead", "error", err)
+				blank := make([]byte, 640*48*4)
+				if err := a.device.SendFrame(context.Background(), blank); err != nil {
+					a.logger.Debug("failed to send blank frame on shutdown", "error", err)
+				}
 			}
 		}
 

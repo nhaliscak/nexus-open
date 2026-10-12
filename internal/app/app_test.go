@@ -224,3 +224,50 @@ func TestApp_Options(t *testing.T) {
 		t.Fatal("expected non-nil app")
 	}
 }
+
+func TestApp_ShutdownRestoresHardwareMode(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	var mock *device.MockDevice
+	app, err := New(
+		WithLogger(logger),
+		WithConfigPath(""),
+		WithAPIPort(19856),
+		WithLayoutPath(defaultLayoutPath()),
+		WithPluginsDir(t.TempDir()),
+		WithDeviceFactory(func(ctx context.Context) (device.Device, error) {
+			mock = device.NewMockDevice()
+			if err := mock.Connect(ctx); err != nil {
+				return nil, err
+			}
+			return mock, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("failed to create app: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- app.Run(ctx) }()
+
+	select {
+	case <-app.Ready():
+	case <-time.After(10 * time.Second):
+		t.Fatal("app did not become ready in time")
+	}
+
+	if err := app.Shutdown(); err != nil {
+		t.Fatalf("shutdown failed: %v", err)
+	}
+	<-done
+
+	cmds := mock.GetFeatureCommands()
+	if len(cmds) == 0 || cmds[len(cmds)-1] != "restore_hardware_mode" {
+		t.Errorf("expected restore_hardware_mode as last feature command, got %v", cmds)
+	}
+	if mock.IsConnected() {
+		t.Error("expected device to be disconnected after shutdown")
+	}
+}

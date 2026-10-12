@@ -82,9 +82,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for the full dev workflow.
 
 ## Known issues
 
-The display stays black after the daemon stops. The firmware has no command to
-restore the Corsair boot screen, so unplug and replug to get it back. The
-settings UI requires XWayland (handled automatically in the packaged binary).
+The settings UI requires XWayland (handled automatically in the packaged binary).
 
 ## More
 
