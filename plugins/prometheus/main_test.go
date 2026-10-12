@@ -219,3 +219,14 @@ func TestShortLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultURLFromEnv(t *testing.T) {
+	t.Setenv(urlEnv, "http://10.43.0.10:9090")
+	if got := defaultConfig().url; got != "http://10.43.0.10:9090" {
+		t.Fatalf("url = %q, want env override", got)
+	}
+	t.Setenv(urlEnv, "")
+	if got := defaultConfig().url; got != defaultURL {
+		t.Fatalf("url = %q, want %q", got, defaultURL)
+	}
+}

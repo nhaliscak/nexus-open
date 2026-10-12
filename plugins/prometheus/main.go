@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,8 +41,17 @@ type config struct {
 	timeout        time.Duration
 }
 
+// urlEnv overrides defaultURL for every zone that doesn't set url itself.
+// Cluster DNS names like defaultURL only resolve inside pods, so a daemon
+// running on a k3s node's host sets this to the service's ClusterIP.
+const urlEnv = "NEXUS_PROMETHEUS_URL"
+
 func defaultConfig() config {
-	return config{url: defaultURL, reduce: reduceAvg, timeout: defaultTimeout}
+	u := defaultURL
+	if env := os.Getenv(urlEnv); env != "" {
+		u = env
+	}
+	return config{url: u, reduce: reduceAvg, timeout: defaultTimeout}
 }
 
 // PrometheusPlugin implements plugin.Plugin.

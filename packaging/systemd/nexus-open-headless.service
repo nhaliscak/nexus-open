@@ -25,6 +25,9 @@ StateDirectory=nexus-open
 Environment=XDG_CONFIG_HOME=%S/nexus-open/config
 Environment=XDG_DATA_HOME=%S/nexus-open/data
 Environment=NEXUS_PLUGINS_DIR=/usr/lib/nexus-open/plugins
+# Host processes on a k3s node cannot resolve cluster DNS; give the prometheus
+# plugin the service ClusterIP via a drop-in (systemctl edit nexus-open):
+#   Environment=NEXUS_PROMETHEUS_URL=http://<cluster-ip>:9090
 
 # ── Privilege & execution hardening ──────────────────────────────────────────
 NoNewPrivileges=true
