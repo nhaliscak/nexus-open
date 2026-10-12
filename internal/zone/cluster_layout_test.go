@@ -36,8 +36,8 @@ func TestClusterLayoutLoads(t *testing.T) {
 			}
 		}
 	}
-	if zones != 12 {
-		t.Errorf("got %d zones, want 12", zones)
+	if zones != 16 {
+		t.Errorf("got %d zones, want 16", zones)
 	}
 }
 

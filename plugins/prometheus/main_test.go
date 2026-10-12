@@ -230,3 +230,35 @@ func TestDefaultURLFromEnv(t *testing.T) {
 		t.Fatalf("url = %q, want %q", got, defaultURL)
 	}
 }
+
+func TestSample_Details(t *testing.T) {
+	cpu, temp, mem := `node_cpu`, `node_temp`, `node_mem`
+	scalar := func(v string) string {
+		return `{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1760000000,"` + v + `"]}]}}`
+	}
+	empty := `{"status":"success","data":{"resultType":"vector","result":[]}}`
+	cfg := map[string]any{
+		"query": cpu, "label": "node1", "unit": "%",
+		"detail_query": temp, "detail_unit": "°C",
+		"detail2_query": mem, "detail2_label": "mem", "detail2_unit": "%",
+	}
+
+	srv := fakeProm(t, map[string]string{cpu: scalar("12.4"), temp: scalar("53.6"), mem: scalar("9.2")})
+	got, err := configured(t, srv.URL, cfg).Sample()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Value != "12" || got.Secondary != "node1 · 54°C · mem 9%" {
+		t.Errorf("got %q / %q", got.Value, got.Secondary)
+	}
+
+	// An empty detail is skipped rather than failing the tile.
+	srv = fakeProm(t, map[string]string{cpu: scalar("12.4"), temp: empty, mem: scalar("9.2")})
+	got, err = configured(t, srv.URL, cfg).Sample()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Secondary != "node1 · mem 9%" {
+		t.Errorf("empty detail: got %q", got.Secondary)
+	}
+}

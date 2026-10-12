@@ -37,7 +37,8 @@ type config struct {
 	totalQuery     string // shown as "value/total"; value < total is critical
 	secondaryQuery string // count shown in the secondary line
 	secondaryLabel string
-	sparkMax       float64 // fixed graph ceiling; 0 = autoscale
+	details        []detail // extra values appended to the secondary line
+	sparkMax       float64  // fixed graph ceiling; 0 = autoscale
 	timeout        time.Duration
 }
 
@@ -53,6 +54,17 @@ func defaultConfig() config {
 	}
 	return config{url: u, reduce: reduceAvg, timeout: defaultTimeout}
 }
+
+// detail is an extra value shown on the secondary line, e.g. a node's
+// temperature under its CPU tile.
+type detail struct {
+	query, label, unit string
+}
+
+// detailKeys are the config key prefixes for details, in display order.
+// Plain string keys (not a list) because zone config crosses net/rpc as
+// map[string]any, which can't carry nested lists without gob registration.
+var detailKeys = []string{"detail", "detail2"}
 
 // PrometheusPlugin implements plugin.Plugin.
 type PrometheusPlugin struct {
@@ -106,6 +118,13 @@ func (p *PrometheusPlugin) Describe() (plugin.Descriptor, error) {
 			{Key: "secondary_query", Label: "Problem count query", Type: plugin.FieldTypeString,
 				Help: "Optional; a non-zero result is shown and raises a warning"},
 			{Key: "secondary_label", Label: "Problem count label", Type: plugin.FieldTypeString},
+			{Key: "detail_query", Label: "Detail query", Type: plugin.FieldTypeString,
+				Help: "Optional; a value shown on the secondary line (max of the series)"},
+			{Key: "detail_label", Label: "Detail label", Type: plugin.FieldTypeString},
+			{Key: "detail_unit", Label: "Detail unit", Type: plugin.FieldTypeString},
+			{Key: "detail2_query", Label: "Second detail query", Type: plugin.FieldTypeString},
+			{Key: "detail2_label", Label: "Second detail label", Type: plugin.FieldTypeString},
+			{Key: "detail2_unit", Label: "Second detail unit", Type: plugin.FieldTypeString},
 			{Key: "spark_max", Label: "Graph ceiling", Type: plugin.FieldTypeString,
 				Help: "Fixed top of the graph (e.g. 100 for %); empty autoscales"},
 		}},
@@ -159,6 +178,15 @@ func parseConfig(raw map[string]any) (config, error) {
 	str("total_query", &cfg.totalQuery)
 	str("secondary_query", &cfg.secondaryQuery)
 	str("secondary_label", &cfg.secondaryLabel)
+	for _, k := range detailKeys {
+		var d detail
+		str(k+"_query", &d.query)
+		str(k+"_label", &d.label)
+		str(k+"_unit", &d.unit)
+		if d.query != "" {
+			cfg.details = append(cfg.details, d)
+		}
+	}
 
 	var reduce string
 	str("reduce", &reduce)
@@ -274,6 +302,22 @@ func (p *PrometheusPlugin) Sample() (plugin.Payload, error) {
 				severity = "warn"
 			}
 		}
+	}
+
+	for _, d := range cfg.details {
+		ds, err := client.query(ctx, d.query)
+		if err != nil {
+			return plugin.Payload{}, fmt.Errorf("%s query: %w", d.label, err)
+		}
+		v, err := reduceMax.apply(ds)
+		if err != nil {
+			continue // a missing detail shouldn't blank the whole tile
+		}
+		text := formatValue(v, 0) + d.unit
+		if d.label != "" {
+			text = d.label + " " + text
+		}
+		secondary = append(secondary, text)
 	}
 
 	p.mu.Lock()

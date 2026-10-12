@@ -98,6 +98,94 @@ pages:
           secondary_query: 'count(kube_pod_status_phase{phase=~"Pending|Failed|Unknown"} == 1)'
           secondary_label: pods down
 
+  # One tile per node: CPU as the value, SoC temperature and memory below.
+  # Node names come from node_uname_info, since instance labels are IP:port.
+  - name: "Nodes"
+    zones:
+      - id: nodes.node1
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#38C878"
+        plugin_config:
+          query: '100 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]) * on(instance) group_left(nodename) node_uname_info{nodename="node1"}) * 100'
+          reduce: max
+          label: NODE1
+          unit: "%"
+          warn: 75
+          crit: 90
+          spark_max: 100
+          detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node1"})'
+          detail_unit: "°C"
+          detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node1"}'
+          detail2_label: mem
+          detail2_unit: "%"
+
+      - id: nodes.node2
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#00C8FF"
+        plugin_config:
+          query: '100 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]) * on(instance) group_left(nodename) node_uname_info{nodename="node2"}) * 100'
+          reduce: max
+          label: NODE2
+          unit: "%"
+          warn: 75
+          crit: 90
+          spark_max: 100
+          detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node2"})'
+          detail_unit: "°C"
+          detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node2"}'
+          detail2_label: mem
+          detail2_unit: "%"
+
+      - id: nodes.node3
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#C87820"
+        plugin_config:
+          query: '100 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]) * on(instance) group_left(nodename) node_uname_info{nodename="node3"}) * 100'
+          reduce: max
+          label: NODE3
+          unit: "%"
+          warn: 75
+          crit: 90
+          spark_max: 100
+          detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node3"})'
+          detail_unit: "°C"
+          detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node3"}'
+          detail2_label: mem
+          detail2_unit: "%"
+
+      - id: nodes.node4
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#FF6B35"
+        plugin_config:
+          query: '100 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]) * on(instance) group_left(nodename) node_uname_info{nodename="node4"}) * 100'
+          reduce: max
+          label: NODE4
+          unit: "%"
+          warn: 75
+          crit: 90
+          spark_max: 100
+          detail_query: 'max(node_thermal_zone_temp{type=~"soc-thermal|bigcore.*"} * on(instance) group_left(nodename) node_uname_info{nodename="node4"})'
+          detail_unit: "°C"
+          detail2_query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename="node4"}'
+          detail2_label: mem
+          detail2_unit: "%"
+
   - name: "Pods"
     zones:
       # Running pods out of all live pods (completed Jobs excluded).
