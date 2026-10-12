@@ -46,6 +46,7 @@ func main() {
 		setupUdev   = flag.Bool("setup-udev", false, "Install udev rules for device access (requires root)")
 		debug       = flag.Bool("debug", false, "Enable debug logging")
 		configPath  = flag.String("config", "", "Path to configuration file")
+		layoutPath  = flag.String("layout", "", "Layout YAML used to seed a fresh store (default: multi-page.yaml)")
 		apiPort     = flag.Int("port", 1985, "API server port")
 		enableTray  = flag.Bool("tray", false, "Enable system tray mode with Flutter UI")
 		showWindow  = flag.Bool("show", false, "Show the window of a running instance and exit")
@@ -111,6 +112,7 @@ func main() {
 	application, err := app.New(
 		app.WithLogger(logger),
 		app.WithConfigPath(*configPath),
+		app.WithLayoutPath(*layoutPath),
 		app.WithAPIPort(*apiPort),
 	)
 	if err != nil {

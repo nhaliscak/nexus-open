@@ -1,0 +1,61 @@
+[Unit]
+Description=Nexus Open — iCUE Nexus daemon (headless)
+Documentation=https://github.com/mantonx/nexus-open
+# For machines with no desktop session (SBCs, cluster nodes). Pair with
+# packaging/udev/99-corsair-nexus-headless.rules, which grants the device to
+# the plugdev group instead of the logged-in seat user.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/nexus-open
+# Seed a fresh install with another layout, e.g. the cluster dashboard:
+#   ExecStart=/usr/bin/nexus-open --layout /usr/share/nexus-open/configs/layouts/cluster.yaml
+Restart=on-failure
+RestartSec=5s
+KillMode=mixed
+TimeoutStopSec=10
+
+# ── Identity & state ─────────────────────────────────────────────────────────
+# Transient user; device access comes from the plugdev group via udev.
+DynamicUser=yes
+SupplementaryGroups=plugdev
+StateDirectory=nexus-open
+# The daemon resolves its DB, token and data dirs from XDG; point both at the
+# state directory so nothing depends on a home directory.
+Environment=XDG_CONFIG_HOME=%S/nexus-open/config
+Environment=XDG_DATA_HOME=%S/nexus-open/data
+Environment=NEXUS_PLUGINS_DIR=/usr/lib/nexus-open/plugins
+# Host processes on a k3s node cannot resolve cluster DNS; give the prometheus
+# plugin the service ClusterIP via a drop-in (systemctl edit nexus-open):
+#   Environment=NEXUS_PROMETHEUS_URL=http://<cluster-ip>:9090
+
+# ── Privilege & execution hardening ──────────────────────────────────────────
+NoNewPrivileges=true
+LockPersonality=true
+RestrictSUIDSGID=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+# ── Kernel & namespace hardening ─────────────────────────────────────────────
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+
+# ── Device access ─────────────────────────────────────────────────────────────
+DevicePolicy=closed
+DeviceAllow=char-usb_device rwm
+
+# ── Network & syscall restrictions ───────────────────────────────────────────
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
