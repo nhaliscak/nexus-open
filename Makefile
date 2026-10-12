@@ -113,7 +113,7 @@ build-ui: $(BIN_DIR)
 build-plugins:
 	@echo "Building external plugins..."
 	@mkdir -p $(BIN_DIR)/plugins
-	@for mod in cpu-temp gpu-temp network weather cpu-load gpu-load media; do \
+	@for mod in cpu-temp gpu-temp network weather cpu-load gpu-load media prometheus; do \
 		if [ -d plugins/$$mod ]; then \
 			echo "  → plugins/$$mod"; \
 			_ldf="$(LDFLAGS)"; \
@@ -398,7 +398,7 @@ install: build-release build-ui build-plugins
 	@sudo install -Dm755 $(BIN_DIR)/$(APP_NAME) $(SYS_BIN)/$(APP_NAME)
 	@echo "Installing plugins to $(SYS_LIB)/plugins..."
 	@sudo mkdir -p $(SYS_LIB)/plugins
-	@for mod in cpu-temp gpu-temp network weather cpu-load gpu-load media; do \
+	@for mod in cpu-temp gpu-temp network weather cpu-load gpu-load media prometheus; do \
 		if [ -f $(BIN_DIR)/plugins/nexus-$$mod ]; then \
 			sudo install -Dm755 $(BIN_DIR)/plugins/nexus-$$mod $(SYS_LIB)/plugins/nexus-$$mod; \
 		fi; \

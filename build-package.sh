@@ -95,7 +95,7 @@ build_binary_static() {
     # These are included in the tarball so AUR and direct installs get them.
     info "Building plugins for tarball..."
     mkdir -p "$REPO_DIR/plugins-dist"
-    for mod in cpu-temp gpu-temp network weather cpu-load gpu-load media; do
+    for mod in cpu-temp gpu-temp network weather cpu-load gpu-load media prometheus; do
         if [[ ! -d "$REPO_DIR/plugins/$mod" ]]; then continue; fi
         _ldf="-trimpath -ldflags \"-s -w\""
         if [[ "$mod" == "media" && -n "${TMDB_TOKEN:-}" ]]; then

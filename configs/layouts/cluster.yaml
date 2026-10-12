@@ -1,0 +1,97 @@
+# Cluster Layout
+# Cluster-wide health from Prometheus (kube-prometheus-stack with
+# node-exporter and kube-state-metrics). Each zone is one PromQL query run by
+# the prometheus plugin; edit the queries to match your metric labels.
+#
+# The default URL is the in-cluster Prometheus service, reachable from any
+# k3s node. Set plugin_config.url to point elsewhere.
+
+name: "Cluster"
+version: "1.0"
+
+theme:
+  bg: "#000000"
+  fg: "#EAEAEA"
+  muted: "#B8BDC2"
+  accent: "#00C8FF"
+  gutter_px: 2
+  font_size_primary: 24
+  font_size_secondary: 9
+
+navigation:
+  swipe_enabled: true
+  auto_rotate: false
+  auto_rotate_interval_s: 10
+
+pages:
+  - name: "Cluster"
+    zones:
+      # Average CPU across nodes; the secondary line names the busiest node.
+      - id: cluster.cpu
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#38C878"
+        plugin_config:
+          query: '100 - avg by (instance)(rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100'
+          reduce: avg
+          label: CPU
+          unit: "%"
+          top_label: instance
+          warn: 75
+          crit: 90
+          spark_max: 100
+
+      # Average memory use across nodes; names the fullest node.
+      - id: cluster.mem
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#00C8FF"
+        plugin_config:
+          query: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)'
+          reduce: avg
+          label: MEM
+          unit: "%"
+          top_label: instance
+          warn: 80
+          crit: 92
+          spark_max: 100
+
+      # Hottest thermal zone on any node (RK3588 SoC sensors).
+      - id: cluster.temp
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 5000
+        align: left
+        theme_override:
+          accent: "#FF6B35"
+        plugin_config:
+          query: 'max by (instance)(node_thermal_zone_temp)'
+          reduce: max
+          label: TEMP
+          unit: "°C"
+          top_label: instance
+          warn: 70
+          crit: 85
+          spark_max: 100
+
+      # Ready nodes out of all nodes, plus pods stuck outside Running.
+      - id: cluster.k8s
+        width: 160
+        plugin: exec:nexus-prometheus
+        refresh_ms: 10000
+        align: left
+        theme_override:
+          accent: "#C87820"
+        plugin_config:
+          query: 'sum(kube_node_status_condition{condition="Ready",status="true"})'
+          reduce: sum
+          label: NODES
+          total_query: 'count(kube_node_info)'
+          secondary_query: 'count(kube_pod_status_phase{phase=~"Pending|Failed|Unknown"} == 1)'
+          secondary_label: pods down
