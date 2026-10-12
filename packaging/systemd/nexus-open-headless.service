@@ -10,6 +10,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/nexus-open
+# Seed a fresh install with another layout, e.g. the cluster dashboard:
+#   ExecStart=/usr/bin/nexus-open --layout /usr/share/nexus-open/configs/layouts/cluster.yaml
 Restart=on-failure
 RestartSec=5s
 KillMode=mixed
