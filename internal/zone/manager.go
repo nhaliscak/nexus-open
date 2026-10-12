@@ -35,20 +35,21 @@ type PluginLookup interface {
 // Manager manages zones, their renderers, and lifecycle.
 //
 // Implementation is split across five files for readability:
-//   manager.go        — struct, NewManager, lifecycle (Start/Stop/Reload)
-//   manager_detail.go — detail overlay (ShowDetail/ClearDetail/HandleZoneTap)
-//   manager_page.go   — page/config/navigation/cache methods
-//   manager_render.go — payload/theme/compositing/frame methods
-//   manager_swipe.go  — live swipe and transition methods
+//
+//	manager.go        — struct, NewManager, lifecycle (Start/Stop/Reload)
+//	manager_detail.go — detail overlay (ShowDetail/ClearDetail/HandleZoneTap)
+//	manager_page.go   — page/config/navigation/cache methods
+//	manager_render.go — payload/theme/compositing/frame methods
+//	manager_swipe.go  — live swipe and transition methods
 type Manager struct {
-	logger     *slog.Logger
-	config     *Config
-	configPath string
-	db         *store.DB // nil when running from YAML only (e.g. cmd binaries)
+	logger      *slog.Logger
+	config      *Config
+	configPath  string
+	db          *store.DB // nil when running from YAML only (e.g. cmd binaries)
 	currentPage int
 	// Lock ordering (when acquiring multiple mutexes, always in this order):
 	//   1. configMu  2. lastFrameMu  3. detailMu  4. payloadsMu
-	configMu   sync.RWMutex // guards m.config pointer reads/writes
+	configMu sync.RWMutex // guards m.config pointer reads/writes
 
 	// Zone state
 	zones      map[string]*Zone
@@ -130,8 +131,8 @@ type Zone struct {
 	Config        ZoneConfig
 	Renderer      *Renderer
 	Plugin        string
-	cachedImg     *image.RGBA  // last rendered image
-	cachedPayload time.Time    // Timestamp of the payload used to produce cachedImg
+	cachedImg     *image.RGBA // last rendered image
+	cachedPayload time.Time   // Timestamp of the payload used to produce cachedImg
 }
 
 // effectiveTapAction returns the tap action for a zone. If the zone's
@@ -296,6 +297,10 @@ func seedDBFromConfig(db *store.DB, cfg *Config, logger *slog.Logger) error {
 				Align:     string(z.Align),
 				OnTap:     string(z.OnTap),
 				Choices:   z.Choices,
+				// Carry the YAML plugin_config over; the sampler reads zone
+				// config only from the store, so dropping it here leaves
+				// seeded plugins unconfigured.
+				ConfigJSON: z.PluginConfig,
 			}
 			if z.ThemeOverride != nil {
 				sz.ThemeJSON = map[string]any{
